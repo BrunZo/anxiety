@@ -1,13 +1,19 @@
-import http.cookies
 import json
 import os
 import random
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from flask import Flask, send_from_directory, jsonify, request
+from pathlib import Path
 
 from db import init_db, insert_anxiety_entry, get_statistics
 
+BASE_DIR = Path(__file__).parent.parent
+
+app = Flask(__name__, 
+            static_folder=str(BASE_DIR / "html"),
+            static_url_path="/")
+
 def _get_random_exercise():
-    content_dir = "content"
+    content_dir = BASE_DIR / "content"
     
     try:
         files = [f for f in os.listdir(content_dir) if os.path.isfile(os.path.join(content_dir, f))]
@@ -26,96 +32,80 @@ def _get_random_exercise():
         return None
 
 
-class RequestHandler(BaseHTTPRequestHandler):
+def _render_page(file):
+    """Render an HTML page from the html directory."""
+    try:
+        html_path = BASE_DIR / "html" / f"{file}.html"
+        return send_from_directory(str(BASE_DIR / "html"), f"{file}.html")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 404
 
-    def _send_json(self, code, data, cookies={}):
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json")
-        for key in cookies:
-            self.send_header("Set-Cookie", f"{key}={cookies[key]}; Path=/; HttpOnly")
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
 
-    def _render_page(self, file):
-        try:
-            url = "html/" + file + ".html"
-            with open(url, "rb") as f:
-                content = f.read()
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset: utf-8")
-                self.send_header("Content-Length", str(len(content)))
-                self.end_headers()
-                self.wfile.write(content)
-        except Exception as e:
-            self._send_json(404, {"error": e})
+@app.route("/")
+@app.route("/button")
+def button():
+    return _render_page("button")
 
-    def _redirect(self, path):
-        self.send_response(302)
-        self.send_header("Location", path)
-        self.end_headers()
-        self.wfile.write(b"")
 
-    def _get_cookie(self, cookie_name):
-        cookie_header = self.headers.get("Cookie")
-        cookies = http.cookies.SimpleCookie(cookie_header)
-        return cookies.get(cookie_name)
+@app.route("/dashboard")
+def dashboard():
+    return _render_page("dashboard")
 
-    def do_GET(self):
 
-        if self.path == "/" or self.path == "/button":
-            self._render_page("button")
+@app.route("/form")
+def form():
+    return _render_page("form")
 
-        if self.path == "/dashboard":
-            self._render_page("dashboard")
 
-        if self.path == "/form":
-            self._render_page("form")
+@app.route("/exercise")
+def exercise():
+    return _render_page("exercise")
 
-        if self.path == "/exercise":
-            self._render_page("exercise")
 
-        if self.path == "/random_exercise":
-            exercise_html = _get_random_exercise()
-            if exercise_html:
-                self._send_json(200, {"exercise": exercise_html})
-            else:
-                self._send_json(404, {"error": "No exercises available"})
+@app.route("/random_exercise")
+def random_exercise():
+    exercise_html = _get_random_exercise()
+    if exercise_html:
+        return jsonify({"exercise": exercise_html})
+    else:
+        return jsonify({"error": "No exercises available"}), 404
 
-        elif self.path == "/api/stats":
-            stats = get_statistics()
-            self._send_json(200, stats)
 
-        else:
-            self._send_json(404, {"error": "Página no encontrada"})
+@app.route("/api/stats")
+def api_stats():
+    stats = get_statistics()
+    return jsonify(stats)
 
-    def do_POST(self):
 
-        try:
-            content_length = int(self.headers.get("Content-Length"))
-            body = self.rfile.read(content_length)
-            data = json.loads(body)
+@app.route("/button", methods=["POST"])
+def button_post():
+    return jsonify({"message": "Button clicked"})
 
-        except json.JSONDecodeError:
-            self._send_json(400, {"error": "Solicitud inválida"})
-            return
 
-        if self.path == "/button":
-            self._send_json(200, {"message": "Button clicked"})
-
-        elif self.path == "/form":
-            anxiety_type = data.get("type", "")
-            description = data.get("description", "")
-            entry_id = insert_anxiety_entry(anxiety_type, description)
-            print(f"Saved anxiety entry (ID: {entry_id}): type={anxiety_type}, description={description}")
-            self._send_json(200, {"message": "Form submitted", "data": data})
-
-        else:
-            self._send_json(404, {"error": "Página no encontrada"})
+@app.route("/form", methods=["POST"])
+def form_post():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Solicitud inválida"}), 400
         
+        anxiety_type = data.get("type", "")
+        description = data.get("description", "")
+        entry_id = insert_anxiety_entry(anxiety_type, description)
+        print(f"Saved anxiety entry (ID: {entry_id}): type={anxiety_type}, description={description}")
+        return jsonify({"message": "Form submitted", "data": data})
+    except Exception as e:
+        return jsonify({"error": "Solicitud inválida"}), 400
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"error": "Página no encontrada"}), 404
+
+
 if __name__ == "__main__":
     init_db()
     print("Database initialized")
     
-    server = HTTPServer(("0.0.0.0", 8000), RequestHandler)
     print("Server starting on http://0.0.0.0:8000")
-    server.serve_forever()
+    app.run(host="0.0.0.0", port=8000, debug=True)
