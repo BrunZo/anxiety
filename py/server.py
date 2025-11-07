@@ -85,15 +85,16 @@ def button_post():
 @app.route("/form", methods=["POST"])
 def form_post():
     try:
-        data = request.get_json()
+        data = request.get_json(force=True)
+        
         if not data:
             return jsonify({"error": "Solicitud inválida"}), 400
         
         anxiety_type = data.get("type", "")
         description = data.get("description", "")
-        entry_id = insert_anxiety_entry(anxiety_type, description)
-        print(f"Saved anxiety entry (ID: {entry_id}): type={anxiety_type}, description={description}")
+        insert_anxiety_entry(anxiety_type, description)
         return jsonify({"message": "Form submitted", "data": data})
+
     except Exception as e:
         return jsonify({"error": "Solicitud inválida"}), 400
 
@@ -107,5 +108,6 @@ if __name__ == "__main__":
     init_db()
     print("Database initialized")
     
-    print("Server starting on http://0.0.0.0:8000")
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    port = int(os.environ.get("PORT", 8000))
+    print(f"Server starting on http://0.0.0.0:{port}")
+    app.run(host="0.0.0.0", port=port, debug=False)

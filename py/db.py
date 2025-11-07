@@ -3,8 +3,7 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "anxiety.db"
-
+DB_PATH = Path("/data") / "anxiety.db"
 
 def get_connection():
     """Get a database connection."""
