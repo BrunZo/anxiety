@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <h1 class="text-4xl font-bold mb-8 text-gray-800">Anxiety Dashboard</h1>
+    <div id="dashboard-content">
+        <div class="text-center py-10 text-gray-600">Loading statistics...</div>
+    </div>
+
+    <script>
+        async function loadStats() {
+            try {
+                const response = await fetch("/api/stats");
+                const stats = await response.json();
+                
+                const content = document.getElementById("dashboard-content");
+                
+                let html = `
+                    <div class="bg-gradient-to-r from-blue-800 to-purple-800 p-8 rounded-lg text-center text-white mb-10">
+                        <h2 class="text-2xl font-semibold mb-2">Total Anxiety Entries</h2>
+                        <div class="text-2xl font-bold">${stats.total || 0}</div>
+                    </div>
+                `;
+                
+                // Statistics by type
+                if (stats.by_type && Object.keys(stats.by_type).length > 0) {
+                    html += `
+                        <div class="mb-10">
+                            <h2 class="text-2xl font-semibold text-gray-800 border-b-2 border-blue-600 pb-2 mb-5">Anxiety by Type</h2>
+                            <div class="grid grid-cols-auto gap-5 mt-5">
+                    `;
+                    
+                    const sortedTypes = Object.entries(stats.by_type)
+                        .sort((a, b) => b[1] - a[1]);
+                    
+                    for (const [type, count] of sortedTypes) {
+                        html += `
+                            <div class="bg-gray-100 p-5 rounded-lg shadow-sm">
+                                <h3 class="text-lg font-semibold mb-2 text-blue-600">${type || 'Unknown'}</h3>
+                                <div class="text-2xl font-bold text-gray-800">${count}</div>
+                            </div>
+                        `;
+                    }
+                    
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                if (stats.by_hour && Object.keys(stats.by_hour).length > 0) {
+                    html += `
+                        <div class="mb-10">
+                            <h2 class="text-2xl font-semibold text-gray-800 border-b-2 border-blue-600 pb-2 mb-5">Anxiety by Hour of Day</h2>
+                            <div class="flex flex-col gap-3">
+                    `;
+                    
+                    // Sort hours and create bars
+                    const sortedHours = Object.entries(stats.by_hour)
+                        .sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+                    
+                    const maxCount = Math.max(...sortedHours.map(h => h[1]));
+                    
+                    for (const [hour, count] of sortedHours) {
+                        const hourLabel = `${String(hour).padStart(2, '0')}:00`;
+                        const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                        
+                        html += `
+                            <div class="flex items-center gap-3">
+                                <div class="w-15 font-bold">${hourLabel}</div>
+                                <div class="flex-1 h-8 bg-gray-200 rounded relative overflow-hidden">
+                                    <div class="h-full bg-blue-600 flex items-center px-3 text-white font-bold transition-all" style="width: ${percentage}%">
+                                        ${count}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                if (stats.total === 0) {
+                    html = `
+                        <div class="mb-10">
+                            <p>No anxiety entries recorded yet. Submit a form to start tracking.</p>
+                        </div>
+                    `;
+                }
+                
+                content.innerHTML = html;
+                
+            } catch (error) {
+                document.getElementById("dashboard-content").innerHTML = 
+                    `<div class="mb-10"><p>Error loading statistics: ${error.message}</p></div>`;
+            }
+        }
+        
+        loadStats();
+        
+        setInterval(loadStats, 30000);
+    </script>
+</body>
+</html>
+

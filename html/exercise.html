@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exercise</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <h1 class="text-4xl font-bold mb-8 text-gray-800">Mindfulness Exercise</h1>
+    <div id="exercise-container" class="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-lg mb-8">
+        <p class="text-center text-gray-600">Loading...</p>
+    </div>
+    <div class="flex justify-center">
+        <button 
+            onclick="window.location.href = '/dashboard'"
+            class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-colors duration-200"
+        >
+            Return to dashboard
+        </button>
+    </div>
+    <script>
+        fetch("/random_exercise", {
+            method: "GET",
+        }).then(response => response.json()).then(data => {
+            const container = document.getElementById("exercise-container");
+            container.innerHTML = data.exercise;
+            container.classList.remove("text-center", "text-gray-600");
+            container.classList.add("prose", "max-w-none");
+        });
+    </script>
+</body>
+</html>
